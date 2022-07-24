@@ -1,0 +1,889 @@
+        #include <st/iostm32f207zx.h>
+
+        ; Uses an STM32F207ZG-SK IAR Board 
+	; containing an Cortex M3 ARM microcontroller
+
+        PUBLIC  __iar_program_start
+        PUBLIC  __vector_table
+
+        Rseg Fred:DATA:NOROOT(2)
+
+
+        SECTION .text:CODE:REORDER(1)
+        
+        ;; Keep vector table even if it's not referenced
+       
+       REQUIRE __vector_table
+        
+        THUMB
+        
+__iar_program_start     
+    B   main
+        
+    ASEGN `.rodata`:CONST:NOROOT,020000000H
+    DATA        // Creates the data segment
+String     DC8        'H', 'E', 'L', 'L', 'O', ' ', 'E', 'A', 'R', 'T', 'H', 0
+
+morseCode       DC8     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+
+      SECTION .text: CODE (2)   // Creates the code segment
+      thumb
+main
+
+    // ------- Board Initialization -------------------------------------------
+    
+  LDR     R0, =RCC_AHB1ENR
+  LDR     R1, [R0]
+  ORR     R1, R1, #(1<<6|1<<5|1<<0)
+  STR     R1, [R0]
+
+  LDR     R0, =GPIOG_MODER
+  LDR     R1, [R0]   
+  BIC     R1, R1, #0x00003000
+  STR     R1, [R0]
+
+  LDR     R0, =GPIOF_MODER
+  LDR     R1, [R0]
+  BIC     R1, R1, #0x000AA000
+  ORR     R1, R1, #0x00055000
+  STR     R1, [R0]
+  
+  LDR     R0, =RCC_APB1ENR
+  LDR     R1, [R0]
+  ORR     R1, R1, #(1<<0)
+  STR     R1, [R0]
+  
+  LDR     R0, =TIM2_PSC
+  LDR     R1, [R0]
+  MOV     R1, #0x00003E80
+  STR     R1, [R0]
+    
+    // Initialize TIM2 Control Register
+  LDR   R0, =TIM2_CR1
+  LDR   R1, [R0]
+  ORR   R1, R1, #(1<<0)
+  STR   R1, [R0]
+  
+   // ------------------------------------------------------------------------
+  
+  
+  //Convert char arry into binary morse code array
+  //Compare to find the conversion of char to morse code while having 
+  //most frequent chars be compared first.
+  //EARIOTNSLCUDPMHGBFYWKVXZJQ  According to the Oxford Dictionary, 9th ed, 1995
+  
+  LDR   R0, =String   // Pointer of the first byte in String array.
+  
+  LDR   R2, =morseCode  // Pointer of the first byte in morseCode array.
+  
+  MOV   R4, #0x80   // Barrel shifter register used for selecting which bit to write to.
+  
+  LDRB  R3, [R2]    // R3 contains the first byte from the morseCode array.
+  
+  EOR   R5, R5, R5  // Clears R5. This register will keep track of the number of bits
+                    // written to in morseCode array.
+      
+           
+           
+  CharToMorseCodeLoop:          
+  // This loop sequentelly finds the letter, number, or space char 
+  // and writes to morseCode array accordingly.
+  
+  LDRB  R1, [R0]   
+  CMP   R1, #0
+  BEQ   DoneWritingToMorseCode
+  
+  // Since numbers+spaceChar and Letters can be separated in the ascii table,
+  // a comparision is made to check either numbers+spaceChar and letters.
+  CMP   R1, #65
+  BLT   NumberAndSpaceChars
+  BGE   CheckLetterChars
+  
+  DoneWritingChar:  
+  ADD   R0, R0, #1
+  B     CharToMorseCodeLoop
+             
+            
+  // Check for 'E'
+  CheckLetterChars:
+  CMP   R1, #69
+  BNE   Check_A
+  BL    WriteBitHigh
+  BL    WriteThreeBitsLow
+  B     DoneWritingChar
+  
+  // Check for 'A'
+  Check_A:
+  CMP   R1, #65
+  BNE   Check_R
+  BL    WriteBitHigh
+  BL    WriteBitLow
+  BL    WriteThreeBitsHigh
+  BL    WriteThreeBitsLow
+  B     DoneWritingChar
+  
+  // Check for 'R'
+  Check_R:
+  CMP   R1, #82
+  BNE   Check_I
+  BL    WriteBitHigh
+  BL    WriteBitLow
+  BL    WriteThreeBitsHigh
+  BL    WriteBitLow
+  BL    WriteBitHigh
+  BL    WriteThreeBitsLow
+  B     DoneWritingChar
+  
+  // Check for 'I'
+  Check_I:
+  CMP   R1, #73
+  BNE   Check_O
+  BL    WriteBitHigh
+  BL    WriteBitLow  
+  BL    WriteBitHigh
+  BL    WriteThreeBitsLow
+  B     DoneWritingChar
+  
+  // Check for 'O'
+  Check_O:
+  CMP   R1, #79
+  BNE   Check_T
+  BL    WriteThreeBitsHigh
+  BL    WriteBitLow
+  BL    WriteThreeBitsHigh
+  BL    WriteBitLow
+  BL    WriteThreeBitsHigh
+  BL    WriteThreeBitsLow  
+  B     DoneWritingChar
+  
+  // Check for 'T'
+  Check_T:
+  CMP   R1, #84
+  BNE   Check_N  
+  BL    WriteThreeBitsHigh
+  BL    WriteThreeBitsLow
+  B     DoneWritingChar
+  
+  // Check for 'N'
+  Check_N:
+  CMP   R1, #78
+  BNE   Check_S
+  BL    WriteThreeBitsHigh
+  BL    WriteBitLow
+  BL    WriteBitHigh
+  BL    WriteThreeBitsLow
+  B     DoneWritingChar
+  
+  // Check for 'S'
+  Check_S:
+  CMP   R1, #83
+  BNE   Check_L
+  BL    WriteBitHigh
+  BL    WriteBitLow
+  BL    WriteBitHigh
+  BL    WriteBitLow
+  BL    WriteBitHigh
+  BL    WriteThreeBitsLow
+  B     DoneWritingChar
+  
+  // Check for 'L'
+  Check_L:
+  CMP   R1, #76
+  BNE   Check_C
+  BL    WriteBitHigh
+  BL    WriteBitLow  
+  BL    WriteThreeBitsHigh
+  BL    WriteBitLow
+  BL    WriteBitHigh
+  BL    WriteBitLow
+  BL    WriteBitHigh
+  BL    WriteThreeBitsLow
+  B     DoneWritingChar
+  
+  // Check for 'C'
+  Check_C:
+  CMP   R1, #67
+  BNE   Check_U
+  BL    WriteThreeBitsHigh
+  BL    WriteBitLow
+  BL    WriteBitHigh
+  BL    WriteBitLow
+  BL    WriteThreeBitsHigh
+  BL    WriteBitLow
+  BL    WriteBitHigh
+  BL    WriteThreeBitsLow
+  B     DoneWritingChar
+  
+  // Check for 'U'
+  Check_U:
+  CMP   R1, #85
+  BNE   Check_D
+  BL    WriteBitHigh
+  BL    WriteBitLow
+  BL    WriteBitHigh
+  BL    WriteBitLow
+  BL    WriteThreeBitsHigh
+  BL    WriteThreeBitsLow
+  B     DoneWritingChar
+  
+  // Check for 'D'
+  Check_D:
+  CMP   R1, #68
+  BNE   Check_P
+  BL    WriteThreeBitsHigh
+  BL    WriteBitLow
+  BL    WriteBitHigh
+  BL    WriteBitLow
+  BL    WriteBitHigh
+  BL    WriteThreeBitsLow
+  B     DoneWritingChar
+  
+  // Check for 'P'
+  Check_P:
+  CMP   R1, #80
+  BNE   Check_M
+  BL    WriteBitHigh
+  BL    WriteBitLow
+  BL    WriteThreeBitsHigh
+  BL    WriteBitLow
+  BL    WriteThreeBitsHigh
+  BL    WriteBitLow
+  BL    WriteBitHigh
+  BL    WriteThreeBitsLow
+  B     DoneWritingChar
+  
+  // Check for 'M'
+  Check_M:
+  CMP   R1, #77
+  BNE   Check_H
+  BL    WriteThreeBitsHigh
+  BL    WriteBitLow
+  BL    WriteThreeBitsHigh
+  BL    WriteThreeBitsLow
+  B     DoneWritingChar
+  
+  // Check for 'H'
+  Check_H:
+  CMP   R1, #72
+  BNE   Check_G
+  BL    WriteBitHigh
+  BL    WriteBitLow
+  BL    WriteBitHigh
+  BL    WriteBitLow
+  BL    WriteBitHigh
+  BL    WriteBitLow
+  BL    WriteBitHigh
+  BL    WriteThreeBitsLow
+  B     DoneWritingChar 
+  
+   // Check for 'G'
+  Check_G:
+  CMP   R1, #71
+  BNE   Check_B
+  BL    WriteThreeBitsHigh
+  BL    WriteBitLow
+  BL    WriteThreeBitsHigh
+  BL    WriteBitLow
+  BL    WriteBitHigh
+  BL    WriteThreeBitsLow
+  B     DoneWritingChar
+  
+  // Check for 'B'
+  Check_B:
+  CMP   R1, #66
+  BNE   Check_F
+  BL    WriteThreeBitsHigh
+  BL    WriteBitLow
+  BL    WriteBitHigh
+  BL    WriteBitLow
+  BL    WriteBitHigh
+  BL    WriteBitLow
+  BL    WriteBitHigh
+  BL    WriteThreeBitsLow
+  B     DoneWritingChar
+  
+  // Check for 'F' 
+  Check_F:
+  CMP   R1, #70
+  BNE   Check_Y
+  BL    WriteBitHigh
+  BL    WriteBitLow
+  BL    WriteBitHigh
+  BL    WriteBitLow
+  BL    WriteThreeBitsHigh
+  BL    WriteBitLow
+  BL    WriteBitHigh
+  BL    WriteThreeBitsLow
+  B     DoneWritingChar
+  
+  // Check for 'Y'
+  Check_Y:
+  CMP   R1, #89
+  BNE   Check_W
+  BL    WriteThreeBitsHigh
+  BL    WriteBitLow
+  BL    WriteBitHigh
+  BL    WriteBitLow
+  BL    WriteThreeBitsHigh
+  BL    WriteBitLow
+  BL    WriteThreeBitsHigh
+  BL    WriteThreeBitsLow
+  B     DoneWritingChar
+  
+  // Check for 'W'
+  Check_W:
+  CMP   R1, #87
+  BNE   Check_K
+  BL    WriteBitHigh
+  BL    WriteBitLow
+  BL    WriteThreeBitsHigh
+  BL    WriteBitLow
+  BL    WriteThreeBitsHigh
+  BL    WriteThreeBitsLow
+  B     DoneWritingChar
+  
+  // Check for 'K'
+  Check_K:
+  CMP   R1, #75
+  BNE   Check_V
+  BL    WriteThreeBitsHigh
+  BL    WriteBitLow
+  BL    WriteBitHigh
+  BL    WriteBitLow
+  BL    WriteThreeBitsHigh
+  BL    WriteThreeBitsLow
+  B     DoneWritingChar
+  
+  // Check for 'V'
+  Check_V:
+  CMP   R1, #86
+  BNE   Check_X
+  BL    WriteBitHigh
+  BL    WriteBitLow
+  BL    WriteBitHigh
+  BL    WriteBitLow
+  BL    WriteBitHigh
+  BL    WriteBitLow
+  BL    WriteThreeBitsHigh
+  BL    WriteThreeBitsLow
+  B     DoneWritingChar
+  
+  // Check for 'X'
+  Check_X:
+  CMP   R1, #88
+  BNE   Check_Z
+  BL    WriteThreeBitsHigh
+  BL    WriteBitLow
+  BL    WriteBitHigh
+  BL    WriteBitLow
+  BL    WriteBitHigh
+  BL    WriteBitLow
+  BL    WriteThreeBitsHigh
+  BL    WriteThreeBitsLow
+  B     DoneWritingChar
+  
+  // Check for 'Z' 
+  Check_Z:
+  CMP   R1, #90
+  BNE   Check_J
+  BL    WriteThreeBitsHigh
+  BL    WriteBitLow
+  BL    WriteThreeBitsHigh
+  BL    WriteBitLow
+  BL    WriteBitHigh
+  BL    WriteBitLow
+  BL    WriteBitHigh
+  BL    WriteThreeBitsLow
+  B     DoneWritingChar
+  
+  // Check for 'J'
+  Check_J:
+  CMP   R1, #74
+  BNE   Check_Q
+  BL    WriteBitHigh
+  BL    WriteBitLow
+  BL    WriteThreeBitsHigh
+  BL    WriteBitLow
+  BL    WriteThreeBitsHigh
+  BL    WriteBitLow
+  BL    WriteThreeBitsHigh
+  BL    WriteThreeBitsLow
+  B     DoneWritingChar
+  
+  // Check for 'Q'
+  Check_Q:
+  CMP   R1, #81
+  BNE   FinishProgram       // This will branch and end program if no usable char is found.
+  BL    WriteThreeBitsHigh
+  BL    WriteBitLow
+  BL    WriteThreeBitsHigh
+  BL    WriteBitLow
+  BL    WriteBitHigh
+  BL    WriteBitLow
+  BL    WriteThreeBitsHigh
+  BL    WriteThreeBitsLow
+  B     DoneWritingChar
+ 
+ 
+ 
+  // Check for ' ' (space)
+  NumberAndSpaceChars:
+  CMP   R1, #32
+  BNE   Check_1
+  BL    WriteBitLow
+  BL    WriteThreeBitsLow
+  B     DoneWritingChar
+
+  // Check for '1'
+  Check_1:
+  CMP   R1, #49
+  BNE   Check_2
+  BL    WriteBitHigh
+  BL    WriteBitLow
+  BL    WriteThreeBitsHigh
+  BL    WriteBitLow
+  BL    WriteThreeBitsHigh
+  BL    WriteBitLow
+  BL    WriteThreeBitsHigh
+  BL    WriteBitLow
+  BL    WriteThreeBitsHigh
+  BL    WriteThreeBitsLow
+  B     DoneWritingChar
+
+  // Check for '2' 
+  Check_2:
+  CMP   R1, #50
+  BNE   Check_3
+  BL    WriteBitHigh
+  BL    WriteBitLow
+  BL    WriteBitHigh
+  BL    WriteBitLow
+  BL    WriteThreeBitsHigh
+  BL    WriteBitLow
+  BL    WriteThreeBitsHigh
+  BL    WriteBitLow
+  BL    WriteThreeBitsHigh
+  BL    WriteThreeBitsLow
+  B     DoneWritingChar
+  
+  // Check for '3'
+  Check_3:
+  CMP   R1, #51
+  BNE   Check_4
+  BL    WriteBitHigh
+  BL    WriteBitLow
+  BL    WriteBitHigh
+  BL    WriteBitLow
+  BL    WriteBitHigh
+  BL    WriteBitLow
+  BL    WriteThreeBitsHigh
+  BL    WriteBitLow
+  BL    WriteThreeBitsHigh
+  BL    WriteThreeBitsLow
+  B     DoneWritingChar
+  
+  // Check for '4'
+  Check_4:
+  CMP   R1, #52
+  BNE   Check_5
+  BL    WriteBitHigh
+  BL    WriteBitLow
+  BL    WriteBitHigh
+  BL    WriteBitLow
+  BL    WriteBitHigh
+  BL    WriteBitLow
+  BL    WriteBitHigh
+  BL    WriteBitLow
+  BL    WriteThreeBitsHigh
+  BL    WriteThreeBitsLow
+  B     DoneWritingChar
+  
+  // Check for '5'
+  Check_5:
+  CMP   R1, #53
+  BNE   Check_6
+  BL    WriteBitHigh
+  BL    WriteBitLow
+  BL    WriteBitHigh
+  BL    WriteBitLow
+  BL    WriteBitHigh
+  BL    WriteBitLow
+  BL    WriteBitHigh
+  BL    WriteBitLow
+  BL    WriteBitHigh
+  BL    WriteThreeBitsLow
+  B     DoneWritingChar
+  
+  // Check for '6'
+  Check_6:
+  CMP   R1, #54
+  BNE   Check_7
+  BL    WriteThreeBitsHigh
+  BL    WriteBitLow
+  BL    WriteBitHigh
+  BL    WriteBitLow
+  BL    WriteBitHigh
+  BL    WriteBitLow
+  BL    WriteBitHigh
+  BL    WriteBitLow
+  BL    WriteBitHigh
+  BL    WriteThreeBitsLow
+  B     DoneWritingChar
+  
+  // Check for '7'
+  Check_7:
+  CMP   R1, #55
+  BNE   Check_8
+  BL    WriteThreeBitsHigh
+  BL    WriteBitLow
+  BL    WriteThreeBitsHigh
+  BL    WriteBitLow
+  BL    WriteBitHigh
+  BL    WriteBitLow
+  BL    WriteBitHigh
+  BL    WriteBitLow
+  BL    WriteBitHigh
+  BL    WriteThreeBitsLow
+  B     DoneWritingChar
+  
+  // Check for '8'  
+  Check_8:
+  CMP   R1, #56
+  BNE   Check_9
+  BL    WriteThreeBitsHigh
+  BL    WriteBitLow
+  BL    WriteThreeBitsHigh
+  BL    WriteBitLow
+  BL    WriteThreeBitsHigh
+  BL    WriteBitLow
+  BL    WriteBitHigh
+  BL    WriteBitLow
+  BL    WriteBitHigh
+  BL    WriteThreeBitsLow
+  B     DoneWritingChar
+  
+  // Check for '9'
+  Check_9:
+  CMP   R1, #57
+  BNE   Check_0
+  BL    WriteThreeBitsHigh
+  BL    WriteBitLow
+  BL    WriteThreeBitsHigh
+  BL    WriteBitLow
+  BL    WriteThreeBitsHigh
+  BL    WriteBitLow
+  BL    WriteThreeBitsHigh
+  BL    WriteBitLow
+  BL    WriteBitHigh
+  BL    WriteThreeBitsLow
+  B     DoneWritingChar
+  
+  // Check for '0'
+  Check_0:
+  CMP   R1, #48
+  BNE   FinishProgram       // This will branch and end program if no usable char is found.
+  BL    WriteThreeBitsHigh
+  BL    WriteBitLow
+  BL    WriteThreeBitsHigh
+  BL    WriteBitLow
+  BL    WriteThreeBitsHigh
+  BL    WriteBitLow
+  BL    WriteThreeBitsHigh
+  BL    WriteBitLow
+  BL    WriteThreeBitsHigh
+  BL    WriteThreeBitsLow
+  B     DoneWritingChar
+  
+  
+  WriteBitHigh:
+  PUSH  {LR}
+  ORR   R3, R3, R4
+  // The ORR operation will write high to a single bit 
+  BL    shiftBitInByteRight
+  Add   R5, R5, #1
+  POP   {LR}
+  BX    LR
+  
+  
+
+  WriteBitLow:
+  // Since the morseCode array is already initialized to zeros,
+  // we don't have to do anything here other than move to the next bit.
+  PUSH  {LR}
+  BL    shiftBitInByteRight  
+  Add   R5, R5, #1
+  POP   {LR}
+  BX    LR
+  
+  
+  
+  WriteThreeBitsLow:
+  PUSH  {LR}
+  BL    shiftBitInByteRight 
+  BL    shiftBitInByteRight
+  BL    shiftBitInByteRight 
+  Add   R5, R5, #3
+  POP   {LR}
+  BX    LR
+  
+  
+  
+  WriteThreeBitsHigh:
+  PUSH  {LR}
+  ORR   R3, R3, R4
+  BL    shiftBitInByteRight
+  ORR   R3, R3, R4
+  BL    shiftBitInByteRight
+  ORR   R3, R3, R4
+  BL    shiftBitInByteRight
+  Add   R5, R5, #3
+  POP   {LR}
+  BX    LR
+
+
+  
+  // More accuratly, this procedure barrel shifts the least significant 
+  // byte containing a single high bit in R4 to the right.
+  // This stores the written byte into morse code array
+  // and loads the next byte only when the byte has been fully written to.
+  
+  shiftBitInByteRight:
+  
+  CMP   R4, #0x1
+  BNE   ShiftByOneBit
+  MOV   R4, #0x80
+  STRB  R3, [R2]
+  ADD   R2, R2, #1
+  LDRB  R3, [R2]
+  B     Done
+  ShiftByOneBit:
+  LSR   R4, R4, #1
+  Done:
+  
+  BX    LR
+  
+  
+  
+  DoneWritingToMorseCode:
+  // Store the remaining bits of the last byte into morse Code Array.
+  STRB  R3, [R2]
+  
+  // These next five blocks of code is to wait for the USER button to be
+  // pressed, record the length of time a unit will be, and to 
+  // start reading the morse code array into the LED.
+  
+  // Check if and loop until USER Button is Pressed.
+  user_button_press:
+  LDR   R0, =GPIOG_IDR
+  LDR   R1, [R0]
+  AND   R1, #0x00000040
+  CMP   R1, #0x00000040
+  BEQ   user_button_press
+  
+  // Start timer TIM2
+  LDR   R0, =TIM2_EGR
+  LDR   R1, [R0]
+  ORR   R1, R1, #(1<<0)
+  STR   R1, [R0]
+  
+  // Check if and loop until User button is off
+  user_button_release:
+  LDR   R0, =GPIOG_IDR
+  LDR   R1, [R0]
+  AND   R1, R1, #0x00000040
+  CMP   R1, #0x00000040
+  BNE   user_button_release
+  
+  // While timer is running, check the counts
+  LDR   R0, =TIM2_CNT
+  LDR   R1, [R0]
+  CMP   R1, #100     // Check to see if timer counts >= 100 milliseconds
+  BLT   user_button_press
+  
+  MOV   R6, R1  // Save the length of time the button was pressed into R6.
+                // R6 will be used to set the length of time for a unit in morse code.
+  
+  // Restart timer
+  LDR   R0, =TIM2_CNT
+  LDR   R1, [R0]
+  MOV   R1, #0
+  STR   R1, [R0]
+  
+  
+  // Turn LED on and off according to the binary morse code array
+  
+  LDR   R2, =morseCode  // Pointer is moved back to the first byte in morseCode array.  
+  
+  LDRB  R3, [R2]    // R3 contains the first byte from the morseCode array
+  
+  MOV   R4, #0x80   // Sets the barrel shifter register back into reading 
+                    // the most significant bit in the least significant byte.
+                    
+  ReadMorseCodeLoop:
+  // Check to see if we're at the end of the morseCode array.
+  CMP   R5, #0
+  BLE   FinishProgram 
+  
+  // Check if the current working bit is high or low.
+  // hold the LED on or off according to the bit that was read.
+  
+  BL ReadBit
+  CMP   R7, #0
+  BEQ   BitIsLow
+  BL    HoldLedOnOneUnit
+  B     ReadMorseCodeLoop  
+  BitIsLow:
+  BL    HoldLedOffOneUnit
+  B     ReadMorseCodeLoop
+  
+  
+  // This procedure reads the current working bit into R7,
+  // and barrel shifts the least significant 
+  // byte containing a single high bit in R4 to the right.
+  // To read the next byte, it loads from morse code array.
+  
+  ReadBit:
+  AND   R7, R3, R4
+  SUB   R5, R5, #1
+  
+  CMP   R4, #0x1
+  BNE   shiftByOneBit
+  MOV   R4, #0x80
+  ADD   R2, R2, #1
+  LDRB  R3, [R2]
+  B     done
+  shiftByOneBit:
+  LSR   R4, R4, #1
+  done:
+  
+  BX    LR
+  
+  
+
+  HoldLedOffOneUnit:
+  
+  // Turn off STAT4 LED
+  LDR   R0, =GPIOF_ODR
+  LDR   R1, [R0]
+  BIC   R1, R1, #(1<<9)
+  STR   R1, [R0]
+  
+  // Restart timer
+  LDR   R0, =TIM2_CNT
+  LDR   R1, [R0]
+  MOV   R1, #0
+  STR   R1, [R0]
+  
+  // While timer is running, check the counts
+  wait_for_timer_one:
+  LDR   R0, =TIM2_CNT
+  LDR   R1, [R0]
+  CMP   R1, R6    // Check to see if timer counts >= R6 milliseconds
+  BLT   wait_for_timer_one
+  
+  BX    LR
+  
+  
+  
+  
+  
+  HoldLedOnOneUnit:
+  
+  // Turn on STAT4 LED
+  LDR   R0, =GPIOF_ODR
+  LDR   R1, [R0]
+  ORR   R1, R1, #(1<<9)
+  STR   R1, [R0]
+  
+  // Restart timer
+  LDR   R0, =TIM2_CNT
+  LDR   R1, [R0]
+  MOV   R1, #0
+  STR   R1, [R0]
+  
+  // While timer is running, check the counts
+  wait_for_timer_two:
+  LDR   R0, =TIM2_CNT
+  LDR   R1, [R0]
+  CMP   R1, R6     // Check to see if timer counts >= R6 milliseconds
+  BLT   wait_for_timer_two
+  
+  BX    LR  
+  
+ 
+  
+  FinishProgram:
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+
+        ;; Forward declaration of sections.
+        SECTION CSTACK:DATA:NOROOT(3)
+        SECTION .intvec:CODE:NOROOT(2)
+        
+        DATA
+
+__vector_table
+        DCD     sfe(CSTACK)
+        DCD     __iar_program_start
+
+        DCD     NMI_Handler
+        DCD     HardFault_Handler
+        DCD     MemManage_Handler
+        DCD     BusFault_Handler
+        DCD     UsageFault_Handler
+        DCD     0
+        DCD     0
+        DCD     0
+        DCD     0
+        DCD     SVC_Handler
+        DCD     DebugMon_Handler
+        DCD     0
+        DCD     PendSV_Handler
+        DCD     SysTick_Handler
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;; Default interrupt handlers.
+;;
+
+        PUBWEAK NMI_Handler
+        PUBWEAK HardFault_Handler
+        PUBWEAK MemManage_Handler
+        PUBWEAK BusFault_Handler
+        PUBWEAK UsageFault_Handler
+        PUBWEAK SVC_Handler
+        PUBWEAK DebugMon_Handler
+        PUBWEAK PendSV_Handler
+        PUBWEAK SysTick_Handler
+
+        SECTION .text:CODE:REORDER:NOROOT(1)
+        THUMB
+
+NMI_Handler
+HardFault_Handler
+MemManage_Handler
+BusFault_Handler
+UsageFault_Handler
+SVC_Handler
+DebugMon_Handler
+PendSV_Handler
+SysTick_Handler
+Default_Handler
+__default_handler
+        CALL_GRAPH_ROOT __default_handler, "interrupt"
+        NOCALL __default_handler
+        B __default_handler
+
+        END
