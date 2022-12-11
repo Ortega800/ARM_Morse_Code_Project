@@ -1,7 +1,12 @@
-        #include <st/iostm32f207zx.h>
-
-        ; Uses an STM32F207ZG-SK IAR Board 
-	; containing an Cortex M3 ARM microcontroller
+       	// Summary: This Program converts an array of characters into an array containing morse code
+	// where each on and off signal is written to each bit in the morse code array.
+	// The user then holds down a button to set the unit of time used for outputing the on and off signals from the morse code array to an LED.
+	// Bit masking and shifting is used to allow for bit writing and reading to the morse code array.
+	
+	// Uses an STM32F207ZG-SK IAR Board 
+	// containing an Cortex M3 ARM microcontroller
+       
+       #include <st/iostm32f207zx.h>
 
         PUBLIC  __iar_program_start
         PUBLIC  __vector_table
@@ -642,7 +647,7 @@ main
 
 
   
-  // More accuratly, this procedure barrel shifts the least significant 
+  // More accurately, this procedure barrel shifts the least significant 
   // byte containing a single high bit in R4 to the right.
   // This stores the written byte into morse code array
   // and loads the next byte only when the byte has been fully written to.
